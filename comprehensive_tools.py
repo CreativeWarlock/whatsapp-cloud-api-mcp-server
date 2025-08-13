@@ -212,6 +212,38 @@ def register_comprehensive_tools(mcp, messaging_handler, template_handler, busin
             return {"status": "error", "message": str(e)}
 
     @mcp.tool()
+    async def create_carousel_template_simple(
+        name: str,
+        category: str,
+        language: str,
+        message_text: str,
+        card_count: int,
+        card_variables: List[List[str]]
+    ) -> dict:
+        """
+        Create a carousel template with simplified interface for easy use.
+        
+        Args:
+            name: Template name (lowercase, numbers, underscores only, max 512 chars)
+            category: Template category (MARKETING, UTILITY)
+            language: Language code (e.g., en_US, es_ES)
+            message_text: Main message text (550 chars max, max 10 emojis total)
+            card_count: Number of cards (2-10)
+            card_variables: List of variable lists for each card
+                Each card should have: [product_name, price, image_url, cta_text]
+                Example: [["Coffee Beans", "$12.99", "https://example.com/coffee.jpg", "Order Now"]]
+                
+        Returns:
+            dict: Template creation response with validation results
+        """
+        try:
+            return await template_handler.create_carousel_template_simple(
+                name, category, language, message_text, card_count, card_variables
+            )
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    @mcp.tool()
     async def delete_message_template(template_name: str) -> dict:
         """
         Delete a message template.

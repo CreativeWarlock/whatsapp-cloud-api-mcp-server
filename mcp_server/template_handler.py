@@ -9,14 +9,6 @@ from .models import (
     MessageTemplate, TemplateCategory, ComponentType, ParameterType,
     CurrencyObject, DateTimeObject, MediaObject
 )
-from .validation import (
-    validateCompleteTemplate, validateTemplateName, validateTemplateCategory,
-    validateLanguageCode, validateCharacterLimits, validateEmojiLimit,
-    validateFormatting, validateButtonCombinations, validateCarouselConsistency,
-    validateVariableExamples, validateButtonText, validateAuthenticationFormat,
-    validateUrls, validatePhoneNumbers, validateMediaHeaders, validateComponentStructure,
-    formatValidationErrors, ValidationResult
-)
 
 class TemplateHandler(BaseWhatsAppHandler):
     """Handler for WhatsApp message template operations"""
@@ -64,23 +56,7 @@ class TemplateHandler(BaseWhatsAppHandler):
         language: str,
         components: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Create a new message template with comprehensive validation"""
-        
-        # Build template data for validation
-        template_data = {
-            "name": name,
-            "category": category.upper(),
-            "language": language,
-            "components": components
-        }
-        
-        # Run comprehensive validation
-        validation_result = validateCompleteTemplate(template_data)
-        
-        if not validation_result.isValid:
-            return formatValidationErrors(validation_result)
-        
-        # Build payload for API call
+        """Create a new message template"""
         payload = {
             "name": name,
             "category": category.upper(),
@@ -88,7 +64,6 @@ class TemplateHandler(BaseWhatsAppHandler):
             "components": components
         }
         
-        # Proceed with API call if validation passes
         return await self._make_request("POST", self.templates_url, payload)
     
     async def delete_message_template(
@@ -102,130 +77,6 @@ class TemplateHandler(BaseWhatsAppHandler):
             params["hsm_id"] = hsm_id
         
         return await self._make_request("DELETE", self.templates_url, params=params)
-    
-    async def create_carousel_template(
-        self,
-        name: str,
-        category: str,
-        language: str,
-        body_text: str,
-        cards: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Create a carousel template with comprehensive validation"""
-        
-        # Validate carousel consistency
-        carousel_validation = validateCarouselConsistency(cards)
-        if not carousel_validation.isValid:
-            return formatValidationErrors(carousel_validation)
-        
-        # Extract all text for emoji validation
-        all_text = [body_text]
-        all_buttons = []
-        
-        for card in cards:
-            if card.get('body_text'):
-                all_text.append(card['body_text'])
-            if card.get('buttons'):
-                all_buttons.extend(card['buttons'])
-        
-        # Validate emoji limit
-        emoji_validation = validateEmojiLimit(all_text)
-        if not emoji_validation.isValid:
-            return formatValidationErrors(emoji_validation)
-        
-        # Validate body character limit
-        body_validation = validateCharacterLimits('body', body_text)
-        if not body_validation.isValid:
-            return formatValidationErrors(body_validation)
-        
-        # Validate formatting
-        format_validation = validateFormatting(body_text)
-        if not format_validation.isValid:
-            return formatValidationErrors(format_validation)
-        
-        # Validate button text
-        if all_buttons:
-            button_validation = validateButtonText(all_buttons)
-            if not button_validation.isValid:
-                return formatValidationErrors(button_validation)
-            
-            # Validate URLs
-            url_validation = validateUrls(all_buttons)
-            if not url_validation.isValid:
-                return formatValidationErrors(url_validation)
-            
-            # Validate phone numbers
-            phone_validation = validatePhoneNumbers(all_buttons)
-            if not phone_validation.isValid:
-                return formatValidationErrors(phone_validation)
-        
-        # Validate template name
-        name_validation = validateTemplateName(name)
-        if not name_validation.isValid:
-            return formatValidationErrors(name_validation)
-        
-        # Validate category
-        category_validation = validateTemplateCategory(category)
-        if not category_validation.isValid:
-            return formatValidationErrors(category_validation)
-        
-        # Validate language
-        language_validation = validateLanguageCode(language)
-        if not language_validation.isValid:
-            return formatValidationErrors(language_validation)
-        
-        # Build components for carousel template
-        components = []
-        
-        # Add body component
-        components.append({
-            "type": "BODY",
-            "text": body_text
-        })
-        
-        # Add carousel cards as components
-        for i, card in enumerate(cards):
-            card_component = {
-                "type": "CAROUSEL",
-                "index": i,
-                "body": {
-                    "text": card.get('body_text', '')
-                }
-            }
-            
-            if card.get('header'):
-                card_component["header"] = card['header']
-            
-            if card.get('buttons'):
-                card_component["buttons"] = card['buttons']
-            
-            components.append(card_component)
-        
-        # Build template data for final validation
-        template_data = {
-            "name": name,
-            "category": category.upper(),
-            "language": language,
-            "components": components
-        }
-        
-        # Run comprehensive validation
-        validation_result = validateCompleteTemplate(template_data)
-        if not validation_result.isValid:
-            return formatValidationErrors(validation_result)
-        
-        # Build payload for API call
-        payload = {
-            "name": name,
-            "category": category.upper(),
-            "language": language,
-            "components": components
-        }
-        
-
-        
-        # Proceed with API call if validation passes
-        return await self._make_request("POST", self.templates_url, payload)
     
     # ================================
     # TEMPLATE MESSAGE SENDING
@@ -551,3 +402,87 @@ class TemplateHandler(BaseWhatsAppHandler):
             "language": language,
             "components": components
         }
+    
+    async def create_carousel_template_simple(
+        self,
+        name: str,
+        category: str,
+        language: str,
+        message_text: str,
+        card_count: int,
+        card_variables: List[List[str]]
+    ) -> Dict[str, Any]:
+        """
+        Create a carousel template with simplified interface.
+        
+        Args:
+            name: Template name (lowercase, numbers, underscores only)
+            category: Template category (MARKETING, UTILITY)
+            language: Language code (e.g., en_US, es_ES)
+            message_text: Main message text (550 chars max)
+            card_count: Number of cards (2-10)
+            card_variables: List of variable lists for each card
+                Each card should have: [product_name, price, image_url, cta_text]
+                
+        Returns:
+            dict: Template creation response
+        """
+        # Validate card count
+        if card_count < 2 or card_count > 10:
+            return {
+                "success": False,
+                "validation_errors": [
+                    {
+                        "field": "card_count",
+                        "message": f"Card count must be between 2-10, got {card_count}"
+                    }
+                ]
+            }
+        
+        # Validate variables match card count
+        if len(card_variables) != card_count:
+            return {
+                "success": False,
+                "validation_errors": [
+                    {
+                        "field": "card_variables",
+                        "message": f"Expected {card_count} card variables, got {len(card_variables)}"
+                    }
+                ]
+            }
+        
+        # Build carousel cards
+        cards = []
+        for i, variables in enumerate(card_variables):
+            if len(variables) < 4:
+                return {
+                    "success": False,
+                    "validation_errors": [
+                        {
+                            "field": f"card_{i+1}_variables",
+                            "message": f"Card {i+1} must have at least 4 variables: [product_name, price, image_url, cta_text]"
+                        }
+                    ]
+                }
+            
+            product_name, price, image_url, cta_text = variables[:4]
+            
+            card = {
+                "body_text": f"Product: {product_name}\nPrice: {price}",
+                "header": {
+                    "format": "IMAGE",
+                    "example": {"header_handle": [image_url]}
+                },
+                "buttons": [
+                    {
+                        "type": "QUICK_REPLY",
+                        "text": cta_text
+                    }
+                ]
+            }
+            cards.append(card)
+        
+        # Use the existing comprehensive carousel creation method
+        return await self.create_carousel_template(
+            name, category, language, message_text, cards
+        )
