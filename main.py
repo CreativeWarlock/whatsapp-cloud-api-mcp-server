@@ -1,5 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 from typing import List, Dict, Any, Optional
+from pathlib import Path
 import os
 from dotenv import load_dotenv
 import asyncio
@@ -12,8 +13,9 @@ from mcp_server import (
     WhatsAppHandler, WhatsAppMessage  # Legacy support
 )
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the script's own directory
+# (not CWD, which may differ when launched by an MCP client)
+load_dotenv(Path(__file__).resolve().parent / '.env')
 
 # Initialize all handlers
 messaging_handler = None
